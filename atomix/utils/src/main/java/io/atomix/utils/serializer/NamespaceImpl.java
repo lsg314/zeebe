@@ -32,10 +32,12 @@ import com.esotericsoftware.kryo.serializers.VersionFieldSerializer;
 import com.esotericsoftware.minlog.Log;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
+import io.atomix.utils.config.ConfigurationException;
 import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
@@ -79,6 +81,15 @@ public class NamespaceImpl implements Namespace, KryoFactory, KryoPool {
   private final boolean registrationRequired;
   private final String friendlyName;
 
+  public NamespaceImpl(final NamespaceConfig config) {
+    this(
+        buildRegistrationBlocks(config),
+        Thread.currentThread().getContextClassLoader(),
+        config.isRegistrationRequired(),
+        config.isCompatible(),
+        config.getName());
+  }
+
   /**
    * Creates a Kryo instance pool.
    *
@@ -98,6 +109,33 @@ public class NamespaceImpl implements Namespace, KryoFactory, KryoPool {
     this.classLoader = classLoader;
     this.compatible = compatible;
     this.friendlyName = checkNotNull(friendlyName);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<RegistrationBlock> buildRegistrationBlocks(final NamespaceConfig config) {
+    final List<Pair<Class<?>[], Serializer<?>>> types = new ArrayList<>();
+    final List<RegistrationBlock> blocks = new ArrayList<>();
+    blocks.addAll(Namespaces.BASIC.getRegisteredBlocks());
+    for (final NamespaceTypeConfig type : config.getTypes()) {
+      try {
+        if (type.getId() == null) {
+          types.add(
+              Pair.of(
+                  new Class[] {type.getType()},
+                  type.getSerializer() != null ? type.getSerializer().newInstance() : null));
+        } else {
+          blocks.add(
+              new RegistrationBlock(
+                  type.getId(),
+                  Collections.singletonList(
+                      Pair.of(new Class[] {type.getType()}, type.getSerializer().newInstance()))));
+        }
+      } catch (final InstantiationException | IllegalAccessException e) {
+        throw new ConfigurationException("Failed to instantiate serializer from configuration", e);
+      }
+    }
+    blocks.add(new RegistrationBlock(FLOATING_ID, types));
+    return blocks;
   }
 
   /**
@@ -196,6 +234,11 @@ public class NamespaceImpl implements Namespace, KryoFactory, KryoPool {
     } finally {
       release(kryo);
     }
+  }
+
+  @Override
+  public ImmutableList<RegistrationBlock> getRegisteredBlocks() {
+    return registeredBlocks;
   }
 
   private String friendlyName() {
@@ -334,14 +377,19 @@ public class NamespaceImpl implements Namespace, KryoFactory, KryoPool {
     private ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     private boolean registrationRequired = true;
     private boolean compatible = false;
+    private String name = NO_NAME;
 
     /**
      * Builds a {@link Namespace} instance.
      *
      * @return KryoNamespace
      */
-    public Namespace build() {
-      return build(NO_NAME);
+    public NamespaceImpl build() {
+      if (!types.isEmpty()) {
+        blocks.add(new RegistrationBlock(this.blockHeadId, types));
+      }
+      return new NamespaceImpl(blocks, classLoader, registrationRequired, compatible, name)
+          .populate(1);
     }
 
     /**
@@ -351,11 +399,17 @@ public class NamespaceImpl implements Namespace, KryoFactory, KryoPool {
      * @return KryoNamespace
      */
     public NamespaceImpl build(final String friendlyName) {
-      if (!types.isEmpty()) {
-        blocks.add(new RegistrationBlock(this.blockHeadId, types));
-      }
-      return new NamespaceImpl(blocks, classLoader, registrationRequired, compatible, friendlyName)
-          .populate(1);
+      this.name = friendlyName;
+      return build();
+    }
+
+    public Builder name(final String name) {
+      this.name = name;
+      return this;
+    }
+
+    public String getName() {
+      return name;
     }
 
     /**
@@ -436,14 +490,14 @@ public class NamespaceImpl implements Namespace, KryoFactory, KryoPool {
      * @param ns KryoNamespace
      * @return this
      */
-    public Builder register(final NamespaceImpl ns) {
-
-      if (blocks.containsAll(ns.registeredBlocks)) {
+    public Builder register(final Namespace ns) {
+      if (blocks.containsAll(ns.getRegisteredBlocks())) {
         // Everything was already registered.
         LOGGER.debug("Ignoring {}, already registered.", ns);
         return this;
       }
-      for (final RegistrationBlock block : ns.registeredBlocks) {
+
+      for (final RegistrationBlock block : ns.getRegisteredBlocks()) {
         this.register(block);
       }
       return this;
@@ -485,6 +539,24 @@ public class NamespaceImpl implements Namespace, KryoFactory, KryoPool {
     public Builder setRegistrationRequired(final boolean registrationRequired) {
       this.registrationRequired = registrationRequired;
       return this;
+    }
+
+    /**
+     * Creates a copy of the builder.
+     *
+     * @return copy of this builder
+     */
+    public Builder copy() {
+      final Builder copy = new Builder();
+      copy.blockHeadId = blockHeadId;
+      copy.blocks.addAll(blocks);
+      copy.classLoader = classLoader;
+      copy.compatible = compatible;
+      copy.types.addAll(types);
+      copy.registrationRequired = registrationRequired;
+      copy.name = name;
+
+      return copy;
     }
   }
 
