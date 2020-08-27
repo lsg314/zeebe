@@ -53,7 +53,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     final AtomicReference<Path> transientPath = new AtomicReference<>();
 
     // when
@@ -71,9 +72,10 @@ public class TransientSnapshotTest {
   public void shouldTransientPathContainsMetadata() {
     // given
     final var index = 1L;
-    final var term = 0L;
+    final var term = 2L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 3, 4).get();
     final AtomicReference<Path> transientPath = new AtomicReference<>();
 
     // when
@@ -84,7 +86,12 @@ public class TransientSnapshotTest {
         });
 
     // then
-    assertThat(transientPath.get()).hasFileName("1-0-123");
+    final var metadata =
+        FileBasedSnapshotMetadata.ofFileName(transientPath.get().getFileName().toString()).get();
+    assertThat(metadata.getIndex()).isEqualTo(1);
+    assertThat(metadata.getTerm()).isEqualTo(2);
+    assertThat(metadata.getProcessedPosition()).isEqualTo(3);
+    assertThat(metadata.getExportedPosition()).isEqualTo(4);
   }
 
   @Test
@@ -92,8 +99,8 @@ public class TransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
 
     // when
     final var success = transientSnapshot.take(p -> true);
@@ -107,8 +114,8 @@ public class TransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
 
     // when
     final var success = transientSnapshot.take(p -> false);
@@ -123,7 +130,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
 
     // when
     final var success =
@@ -142,7 +150,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     transientSnapshot.take(p -> true);
 
     // when - then
@@ -155,7 +164,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
 
     // when - then
     transientSnapshot.abort();
@@ -166,8 +176,8 @@ public class TransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     transientSnapshot.take(this::takeSnapshot);
 
     // when
@@ -176,10 +186,6 @@ public class TransientSnapshotTest {
     // then
     assertThat(persistedSnapshot.getIndex()).isEqualTo(1L);
     assertThat(persistedSnapshot.getTerm()).isEqualTo(0L);
-    assertThat(persistedSnapshot.getTimestamp()).isEqualTo(time);
-
-    final var snapshotId = persistedSnapshot.getId();
-    assertThat(snapshotId).isEqualTo("1-0-123");
 
     final var snapshotPath = persistedSnapshot.getPath();
     assertThat(snapshotPath).exists();
@@ -187,7 +193,7 @@ public class TransientSnapshotTest {
     assertThat(lastTransientSnapshotPath).doesNotExist();
 
     final var committedSnapshotDir = snapshotPath.toFile();
-    assertThat(committedSnapshotDir.getName()).isEqualTo("1-0-123");
+    assertThat(committedSnapshotDir.getName()).isEqualTo(persistedSnapshot.getId());
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -200,7 +206,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     transientSnapshot.take(this::takeSnapshot);
     final var persistedSnapshot = transientSnapshot.persist();
 
@@ -219,13 +226,14 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     transientSnapshot.take(this::takeSnapshot);
     final var previousSnapshot = transientSnapshot.persist();
 
     // when
     final var newTransientSnapshot =
-        persistedSnapshotStore.newTransientSnapshot(index + 1, term, time);
+        persistedSnapshotStore.newTransientSnapshot(index + 1, term, 1, 0).get();
     newTransientSnapshot.take(this::takeSnapshot);
     final var persistedSnapshot = newTransientSnapshot.persist();
 
@@ -239,13 +247,14 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     transientSnapshot.take(this::takeSnapshot);
     final var previousSnapshot = transientSnapshot.persist();
 
     // when
     final var newTransientSnapshot =
-        persistedSnapshotStore.newTransientSnapshot(index + 1, term, time);
+        persistedSnapshotStore.newTransientSnapshot(index + 1, term, 1, 0).get();
     newTransientSnapshot.take(this::takeSnapshot);
     final var persistedSnapshot = newTransientSnapshot.persist();
 
@@ -257,7 +266,7 @@ public class TransientSnapshotTest {
     assertThat(snapshotPath).isNotEqualTo(lastTransientSnapshotPath);
 
     final var committedSnapshotDir = snapshotPath.toFile();
-    assertThat(committedSnapshotDir.getName()).isEqualTo("2-0-123");
+    assertThat(committedSnapshotDir.getName()).isEqualTo(persistedSnapshot.getId());
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -270,12 +279,14 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var oldTransientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var oldTransientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     oldTransientSnapshot.take(this::takeSnapshot);
     final var oldTransientSnapshotPath = this.lastTransientSnapshotPath;
 
     // when
-    final var newSnapshot = persistedSnapshotStore.newTransientSnapshot(index + 1, term, time);
+    final var newSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index + 1, term, 1, 0).get();
     newSnapshot.take(this::takeSnapshot);
     final var persistedSnapshot = newSnapshot.persist();
 
@@ -292,12 +303,12 @@ public class TransientSnapshotTest {
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
     final var newTransientSnapshot =
-        persistedSnapshotStore.newTransientSnapshot(index + 1, term, time);
+        persistedSnapshotStore.newTransientSnapshot(index + 1, term, 1, 0).get();
     newTransientSnapshot.take(this::takeSnapshot);
     final var oldTransientSnapshotPath = this.lastTransientSnapshotPath;
 
     // when
-    final var oldSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var oldSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     oldSnapshot.take(this::takeSnapshot);
     final var persistedSnapshot = oldSnapshot.persist();
 
@@ -313,7 +324,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var oldTransientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var oldTransientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
 
     // when
     oldTransientSnapshot.take(
@@ -337,7 +349,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var oldTransientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var oldTransientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
 
     // when
     oldTransientSnapshot.take(
@@ -362,7 +375,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     persistedSnapshotStore.addSnapshotListener(listener);
     transientSnapshot.take(this::takeSnapshot);
 
@@ -380,7 +394,8 @@ public class TransientSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     persistedSnapshotStore.addSnapshotListener(listener);
     persistedSnapshotStore.removeSnapshotListener(listener);
     transientSnapshot.take(this::takeSnapshot);

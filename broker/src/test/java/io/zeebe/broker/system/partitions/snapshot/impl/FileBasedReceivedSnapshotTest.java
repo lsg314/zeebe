@@ -7,10 +7,6 @@
  */
 package io.zeebe.broker.system.partitions.snapshot.impl;
 
-import static io.zeebe.broker.system.partitions.snapshot.impl.SnapshotChunkWrapper.withDifferentChecksum;
-import static io.zeebe.broker.system.partitions.snapshot.impl.SnapshotChunkWrapper.withDifferentSnapshotChecksum;
-import static io.zeebe.broker.system.partitions.snapshot.impl.SnapshotChunkWrapper.withDifferentSnapshotId;
-import static io.zeebe.broker.system.partitions.snapshot.impl.SnapshotChunkWrapper.withDifferentTotalCount;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -85,8 +81,7 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    takeAndReceiveSnapshot(index, term, time);
+    takeAndReceiveSnapshot(index, term);
 
     // then
     assertThat(receiverSnapshotsDir.toFile().listFiles()).isEmpty();
@@ -96,8 +91,6 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(files).isNotNull().hasSize(1);
 
     final var dir = files[0];
-    assertThat(dir).hasName("1-0-123-1");
-
     final var snapshotFileList = dir.listFiles();
     assertThat(snapshotFileList).isNotNull().extracting(File::getName).containsExactly("file1.txt");
   }
@@ -107,8 +100,7 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final PersistedSnapshot persistedSnapshot = takeSnapshot(index, term, time);
+    final PersistedSnapshot persistedSnapshot = takeSnapshot(index, term);
 
     final var receivedSnapshot =
         receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
@@ -131,8 +123,7 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    takeAndReceiveSnapshot(index, term, time);
+    takeAndReceiveSnapshot(index, term);
 
     // when
     receiverSnapshotStore.purgePendingSnapshots();
@@ -147,8 +138,7 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var receivedSnapshot = takeAndReceiveSnapshot(index, term, time);
+    final var receivedSnapshot = takeAndReceiveSnapshot(index, term);
 
     // when
     final var snapshot = receivedSnapshot.persist();
@@ -162,7 +152,7 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(files).isNotNull().hasSize(1);
 
     final var dir = files[0];
-    assertThat(dir).hasName("1-0-123");
+    assertThat(dir).hasName(snapshot.getId());
 
     final var snapshotFileList = dir.listFiles();
     assertThat(snapshotFileList).isNotNull().extracting(File::getName).containsExactly("file1.txt");
@@ -173,8 +163,7 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    takeAndReceiveSnapshot(index, term, time).persist();
+    final var snapshot = takeAndReceiveSnapshot(index, term).persist();
 
     // when
     receiverSnapshotStore.purgePendingSnapshots();
@@ -187,7 +176,7 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(files).isNotNull().hasSize(1);
 
     final var dir = files[0];
-    assertThat(dir).hasName("1-0-123");
+    assertThat(dir).hasName(snapshot.getId());
 
     final var snapshotFileList = dir.listFiles();
     assertThat(snapshotFileList).isNotNull().extracting(File::getName).containsExactly("file1.txt");
@@ -198,11 +187,10 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    takeAndReceiveSnapshot(index, term, time).persist();
+    takeAndReceiveSnapshot(index, term).persist();
 
     // when
-    takeAndReceiveSnapshot(index + 1, term, time).persist();
+    takeAndReceiveSnapshot(index + 1, term).persist();
 
     // then
     assertThat(receiverPendingSnapshotsDir.toFile().listFiles()).isEmpty();
@@ -211,7 +199,9 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("2-0-123");
+    assertThat(
+            FileBasedSnapshotMetadata.ofFileName(committedSnapshotDir.getName()).get().getIndex())
+        .isEqualTo(2);
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -223,11 +213,10 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    takeAndReceiveSnapshot(index, term, time);
+    takeAndReceiveSnapshot(index, term);
 
     // when
-    takeAndReceiveSnapshot(index + 1, term, time).persist();
+    takeAndReceiveSnapshot(index + 1, term).persist();
 
     // then
     assertThat(receiverPendingSnapshotsDir.toFile().listFiles()).isEmpty();
@@ -236,7 +225,9 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("2-0-123");
+    assertThat(
+            FileBasedSnapshotMetadata.ofFileName(committedSnapshotDir.getName()).get().getIndex())
+        .isEqualTo(2);
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -248,17 +239,16 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
 
     final FileBasedSnapshotStore otherStore =
         (FileBasedSnapshotStore)
             new FileBasedSnapshotStoreFactory()
                 .createSnapshotStore(temporaryFolder.newFolder("other").toPath(), "1");
-    final var olderTransient = otherStore.newTransientSnapshot(index, term, time);
+    final var olderTransient = otherStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     olderTransient.take(this::takeSnapshot);
     final var olderPersistedSnapshot = olderTransient.persist();
 
-    final PersistedSnapshot newPersistedSnapshot = takeSnapshot(index + 1, term, time);
+    final PersistedSnapshot newPersistedSnapshot = takeSnapshot(index + 1, term);
     receiveSnapshot(newPersistedSnapshot);
 
     // when
@@ -269,7 +259,8 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(pendingSnapshotDirs).isNotNull().hasSize(1);
 
     final var pendingSnapshotDir = pendingSnapshotDirs[0];
-    assertThat(pendingSnapshotDir.getName()).isEqualTo("2-0-123-1");
+    assertThat(FileBasedSnapshotMetadata.ofFileName(pendingSnapshotDir.getName()).get().getIndex())
+        .isEqualTo(2);
     assertThat(pendingSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -279,7 +270,7 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("1-0-123");
+    assertThat(committedSnapshotDir.getName()).isEqualTo(olderPersistedSnapshot.getId());
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -292,11 +283,10 @@ public class FileBasedReceivedSnapshotTest {
     final var listener = mock(PersistedSnapshotListener.class);
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
     receiverSnapshotStore.addSnapshotListener(listener);
 
     // when
-    final var persistedSnapshot = takeAndReceiveSnapshot(index, term, time).persist();
+    final var persistedSnapshot = takeAndReceiveSnapshot(index, term).persist();
 
     // then
     verify(listener, times(1)).onNewSnapshot(eq(persistedSnapshot));
@@ -308,12 +298,11 @@ public class FileBasedReceivedSnapshotTest {
     final var listener = mock(PersistedSnapshotListener.class);
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
     senderSnapshotStore.addSnapshotListener(listener);
     senderSnapshotStore.removeSnapshotListener(listener);
 
     // when
-    final var persistedSnapshot = takeAndReceiveSnapshot(index, term, time).persist();
+    final var persistedSnapshot = takeAndReceiveSnapshot(index, term).persist();
 
     // then
     verify(listener, times(0)).onNewSnapshot(eq(persistedSnapshot));
@@ -324,8 +313,7 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var persistedSnapshot = takeSnapshot(index, term, time);
+    final var persistedSnapshot = takeSnapshot(index, term);
 
     // when
     receiveSnapshot(persistedSnapshot);
@@ -341,13 +329,13 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(files).isNotNull().hasSize(2);
 
     final var dir = files.get(0);
-    assertThat(dir).hasName("1-0-123-1");
+    assertThat(dir).hasName(persistedSnapshot.getId() + "-1");
 
     final var snapshotFileList = dir.listFiles();
     assertThat(snapshotFileList).isNotNull().extracting(File::getName).containsExactly("file1.txt");
 
     final var otherDir = files.get(1);
-    assertThat(otherDir).hasName("1-0-123-2");
+    assertThat(otherDir).hasName(persistedSnapshot.getId() + "-2");
 
     final var otherSnapshotFileList = dir.listFiles();
     assertThat(otherSnapshotFileList)
@@ -361,8 +349,7 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var persistedSnapshot = takeSnapshot(index, term, time);
+    final var persistedSnapshot = takeSnapshot(index, term);
     final var receivedSnapshot = receiveSnapshot(persistedSnapshot);
     final var otherReceivedSnapshot = receiveSnapshot(persistedSnapshot);
 
@@ -377,7 +364,7 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("1-0-123");
+    assertThat(committedSnapshotDir.getName()).isEqualTo(persistedSnapshot.getId());
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -391,8 +378,7 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var persistedSnapshot = takeSnapshot(index, term, time);
+    final var persistedSnapshot = takeSnapshot(index, term);
     final var receivedSnapshot = receiveSnapshot(persistedSnapshot);
     final var otherReceivedSnapshot = receiveSnapshot(persistedSnapshot);
 
@@ -407,7 +393,7 @@ public class FileBasedReceivedSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("1-0-123");
+    assertThat(committedSnapshotDir.getName()).isEqualTo(persistedSnapshot.getId());
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -421,8 +407,8 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = senderSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        senderSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -430,7 +416,9 @@ public class FileBasedReceivedSnapshotTest {
         receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       while (snapshotChunkReader.hasNext()) {
-        receivedSnapshot.apply(withDifferentSnapshotChecksum(snapshotChunkReader.next(), 0xCAFEL));
+        receivedSnapshot.apply(
+            SnapshotChunkWrapper.withDifferentSnapshotChecksum(
+                snapshotChunkReader.next(), 0xCAFEL));
       }
     }
     assertThatThrownBy(receivedSnapshot::persist).isInstanceOf(IllegalStateException.class);
@@ -448,8 +436,8 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = senderSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        senderSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -463,7 +451,8 @@ public class FileBasedReceivedSnapshotTest {
       assertThat(success).isTrue();
       success =
           receivedSnapshot.apply(
-              withDifferentSnapshotChecksum(snapshotChunkReader.next(), 0xCAFEL));
+              SnapshotChunkWrapper.withDifferentSnapshotChecksum(
+                  snapshotChunkReader.next(), 0xCAFEL));
 
       // then
       assertThat(success).isFalse();
@@ -475,8 +464,8 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = senderSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        senderSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -487,7 +476,8 @@ public class FileBasedReceivedSnapshotTest {
 
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       final var success =
-          receivedSnapshot.apply(withDifferentChecksum(snapshotChunkReader.next(), 0xCAFEL));
+          receivedSnapshot.apply(
+              SnapshotChunkWrapper.withDifferentChecksum(snapshotChunkReader.next(), 0xCAFEL));
 
       // then
       assertThat(success).isFalse();
@@ -499,8 +489,8 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = senderSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        senderSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -508,7 +498,9 @@ public class FileBasedReceivedSnapshotTest {
         receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       while (snapshotChunkReader.hasNext()) {
-        receivedSnapshot.apply(withDifferentSnapshotChecksum(snapshotChunkReader.next(), 0xCAFEL));
+        receivedSnapshot.apply(
+            SnapshotChunkWrapper.withDifferentSnapshotChecksum(
+                snapshotChunkReader.next(), 0xCAFEL));
       }
     }
 
@@ -522,7 +514,8 @@ public class FileBasedReceivedSnapshotTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = senderSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        senderSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -534,7 +527,9 @@ public class FileBasedReceivedSnapshotTest {
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       var success = receivedSnapshot.apply(snapshotChunkReader.next());
       assertThat(success).isTrue();
-      success = receivedSnapshot.apply(withDifferentTotalCount(snapshotChunkReader.next(), 55));
+      success =
+          receivedSnapshot.apply(
+              SnapshotChunkWrapper.withDifferentTotalCount(snapshotChunkReader.next(), 55));
 
       // then
       assertThat(success).isFalse();
@@ -546,8 +541,8 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = senderSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        senderSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -555,7 +550,8 @@ public class FileBasedReceivedSnapshotTest {
         receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       while (snapshotChunkReader.hasNext()) {
-        receivedSnapshot.apply(withDifferentTotalCount(snapshotChunkReader.next(), 2));
+        receivedSnapshot.apply(
+            SnapshotChunkWrapper.withDifferentTotalCount(snapshotChunkReader.next(), 2));
       }
     }
 
@@ -568,8 +564,8 @@ public class FileBasedReceivedSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = senderSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        senderSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -581,23 +577,25 @@ public class FileBasedReceivedSnapshotTest {
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       var success = receivedSnapshot.apply(snapshotChunkReader.next());
       assertThat(success).isTrue();
-      success = receivedSnapshot.apply(withDifferentSnapshotId(snapshotChunkReader.next(), "id"));
+      success =
+          receivedSnapshot.apply(
+              SnapshotChunkWrapper.withDifferentSnapshotId(snapshotChunkReader.next(), "id"));
 
       // then
       assertThat(success).isFalse();
     }
   }
 
-  private ReceivedSnapshot takeAndReceiveSnapshot(
-      final long index, final long term, final WallClockTimestamp time) throws IOException {
-    final PersistedSnapshot persistedSnapshot = takeSnapshot(index, term, time);
+  private ReceivedSnapshot takeAndReceiveSnapshot(final long index, final long term)
+      throws IOException {
+    final PersistedSnapshot persistedSnapshot = takeSnapshot(index, term);
 
     return receiveSnapshot(persistedSnapshot);
   }
 
-  private PersistedSnapshot takeSnapshot(
-      final long index, final long term, final WallClockTimestamp time) {
-    final var transientSnapshot = senderSnapshotStore.newTransientSnapshot(index, term, time);
+  private PersistedSnapshot takeSnapshot(final long index, final long term) {
+    final var transientSnapshot =
+        senderSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(this::takeSnapshot);
     return transientSnapshot.persist();
   }

@@ -13,6 +13,7 @@ import io.atomix.raft.snapshot.ReceivedSnapshot;
 import io.atomix.raft.snapshot.TransientSnapshot;
 import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.broker.system.partitions.snapshot.ActivePersistedSnapshotStore;
+import io.zeebe.broker.system.partitions.snapshot.SnapshotId;
 import io.zeebe.util.FileUtil;
 import io.zeebe.util.ZbLogger;
 import java.io.IOException;
@@ -99,14 +100,6 @@ public final class FileBasedSnapshotStore implements ActivePersistedSnapshotStor
   }
 
   @Override
-  public TransientSnapshot newTransientSnapshot(
-      final long index, final long term, final WallClockTimestamp timestamp) {
-    final var directory = buildPendingSnapshotDirectory(index, term, timestamp);
-    final var fileBasedSnapshotMetadata = new FileBasedSnapshotMetadata(index, term, timestamp);
-    return new FileBasedTransientSnapshot(fileBasedSnapshotMetadata, directory, this);
-  }
-
-  @Override
   public ReceivedSnapshot newReceivedSnapshot(final String snapshotId) {
     final var optMetadata = FileBasedSnapshotMetadata.ofFileName(snapshotId);
     final var metadata =
@@ -171,6 +164,28 @@ public final class FileBasedSnapshotStore implements ActivePersistedSnapshotStor
     }
   }
 
+  @Override
+  public Optional<TransientSnapshot> newTransientSnapshot(
+      final long index,
+      final long term,
+      final long processedPosition,
+      final long exportedPosition) {
+
+    final WallClockTimestamp timestamp = WallClockTimestamp.from(System.currentTimeMillis());
+    final var newSnapshotId =
+        new FileBasedSnapshotMetadata(index, term, timestamp, processedPosition, exportedPosition);
+    final FileBasedSnapshot currentSnapshot = currentPersistedSnapshotRef.get();
+    if (currentSnapshot != null && currentSnapshot.getMetadata().compareTo(newSnapshotId) == 0) {
+      LOGGER.debug(
+          "Previous snapshot was taken for the same processed position {} and exported position {}, will not take snapshot.",
+          processedPosition,
+          exportedPosition);
+      return Optional.empty();
+    }
+    final var directory = buildPendingSnapshotDirectory(newSnapshotId);
+    return Optional.of(new FileBasedTransientSnapshot(newSnapshotId, directory, this));
+  }
+
   private void observeSnapshotSize(final PersistedSnapshot persistedSnapshot) {
     try (final var contents = Files.newDirectoryStream(persistedSnapshot.getPath())) {
       var totalSize = 0L;
@@ -191,7 +206,7 @@ public final class FileBasedSnapshotStore implements ActivePersistedSnapshotStor
     }
   }
 
-  private void purgePendingSnapshots(final long cutoffIndex) {
+  private void purgePendingSnapshots(final SnapshotId cutoffIndex) {
     LOGGER.debug(
         "Search for orphaned snapshots below oldest valid snapshot with index {} in {}",
         cutoffIndex,
@@ -209,9 +224,9 @@ public final class FileBasedSnapshotStore implements ActivePersistedSnapshotStor
     }
   }
 
-  private void purgePendingSnapshot(final long cutoffIndex, final Path pendingSnapshot) {
+  private void purgePendingSnapshot(final SnapshotId cutoffIndex, final Path pendingSnapshot) {
     final var optionalMetadata = FileBasedSnapshotMetadata.ofPath(pendingSnapshot);
-    if (optionalMetadata.isPresent() && optionalMetadata.get().getIndex() < cutoffIndex) {
+    if (optionalMetadata.isPresent() && optionalMetadata.get().compareTo(cutoffIndex) < 0) {
       try {
         FileUtil.deleteFolder(pendingSnapshot);
         LOGGER.debug("Deleted orphaned snapshot {}", pendingSnapshot);
@@ -243,7 +258,7 @@ public final class FileBasedSnapshotStore implements ActivePersistedSnapshotStor
 
     if (isCurrentSnapshotNewer(metadata)) {
       LOGGER.debug("Snapshot is older then {} already exists", currentPersistedSnapshot);
-      purgePendingSnapshots(metadata.getIndex() + 1);
+      purgePendingSnapshots(metadata);
       return currentPersistedSnapshot;
     }
 
@@ -284,7 +299,7 @@ public final class FileBasedSnapshotStore implements ActivePersistedSnapshotStor
       LOGGER.debug("Deleting snapshot {}", currentPersistedSnapshot);
       currentPersistedSnapshot.delete();
     }
-    purgePendingSnapshots(newPersistedSnapshot.getIndex());
+    purgePendingSnapshots(newPersistedSnapshot.getMetadata());
 
     listeners.forEach(listener -> listener.onNewSnapshot(newPersistedSnapshot));
 
@@ -310,10 +325,8 @@ public final class FileBasedSnapshotStore implements ActivePersistedSnapshotStor
     }
   }
 
-  private Path buildPendingSnapshotDirectory(
-      final long index, final long term, final WallClockTimestamp timestamp) {
-    final var metadata = new FileBasedSnapshotMetadata(index, term, timestamp);
-    return pendingDirectory.resolve(metadata.getSnapshotIdAsString());
+  private Path buildPendingSnapshotDirectory(final SnapshotId id) {
+    return pendingDirectory.resolve(id.getSnapshotIdAsString());
   }
 
   private Path buildSnapshotDirectory(final FileBasedSnapshotMetadata metadata) {

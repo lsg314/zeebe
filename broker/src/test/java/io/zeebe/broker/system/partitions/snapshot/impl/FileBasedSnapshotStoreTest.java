@@ -10,7 +10,6 @@ package io.zeebe.broker.system.partitions.snapshot.impl;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.util.FileUtil;
 import java.io.File;
 import java.io.IOException;
@@ -30,17 +29,18 @@ public class FileBasedSnapshotStoreTest {
   private FileBasedSnapshotStore persistedSnapshotStore;
   private Path snapshotsDir;
   private Path pendingSnapshotsDir;
+  private FileBasedSnapshotStoreFactory factory;
   private File root;
   private String partitionName;
 
   @Before
   public void before() {
+    factory = new FileBasedSnapshotStoreFactory();
     partitionName = "1";
     root = temporaryFolder.getRoot();
 
     persistedSnapshotStore =
-        (FileBasedSnapshotStore)
-            new FileBasedSnapshotStoreFactory().createSnapshotStore(root.toPath(), partitionName);
+        (FileBasedSnapshotStore) factory.createSnapshotStore(root.toPath(), partitionName);
 
     snapshotsDir =
         temporaryFolder
@@ -77,14 +77,13 @@ public class FileBasedSnapshotStoreTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(this::createSnapshotDir);
     final var persistedSnapshot = transientSnapshot.persist();
 
     // when
-    final var snapshotStore =
-        new FileBasedSnapshotStoreFactory().createSnapshotStore(root.toPath(), partitionName);
+    final var snapshotStore = factory.createSnapshotStore(root.toPath(), partitionName);
 
     // then
     final var currentSnapshotIndex = snapshotStore.getCurrentSnapshotIndex();

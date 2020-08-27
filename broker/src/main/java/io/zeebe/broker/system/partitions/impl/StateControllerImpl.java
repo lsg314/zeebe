@@ -12,7 +12,6 @@ import io.atomix.raft.snapshot.PersistedSnapshotListener;
 import io.atomix.raft.snapshot.ReceivedSnapshot;
 import io.atomix.raft.snapshot.SnapshotChunk;
 import io.atomix.raft.snapshot.TransientSnapshot;
-import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.broker.system.partitions.AtomixRecordEntrySupplier;
 import io.zeebe.broker.system.partitions.SnapshotReplication;
 import io.zeebe.broker.system.partitions.StateController;
@@ -77,7 +76,9 @@ public class StateControllerImpl implements StateController, PersistedSnapshotLi
       return Optional.empty();
     }
 
-    final long snapshotPosition = determineSnapshotPosition(lowerBoundSnapshotPosition);
+    final long exportedPosition = exporterPositionSupplier.applyAsLong(openDb());
+    final long snapshotPosition =
+        determineSnapshotPosition(lowerBoundSnapshotPosition, exportedPosition);
     final var optionalIndexed = entrySupplier.getIndexedEntry(snapshotPosition);
     if (optionalIndexed.isEmpty()) {
       LOG.warn(
@@ -87,22 +88,14 @@ public class StateControllerImpl implements StateController, PersistedSnapshotLi
     }
 
     final var snapshotIndexedEntry = optionalIndexed.get();
-    final long previousSnapshotIndex =
-        store.getLatestSnapshot().map(PersistedSnapshot::getCompactionBound).orElse(-1L);
-    if (snapshotIndexedEntry.index() == previousSnapshotIndex) {
-      LOG.debug(
-          "Previous snapshot was taken for the same indexed entry {}, will not take snapshot.",
-          snapshotIndexedEntry);
-      return Optional.empty();
-    }
-
-    final var transientSnapshot =
+    final Optional<TransientSnapshot> transientSnapshot =
         store.newTransientSnapshot(
             snapshotIndexedEntry.index(),
             snapshotIndexedEntry.entry().term(),
-            WallClockTimestamp.from(System.currentTimeMillis()));
-    takeSnapshot(transientSnapshot);
-    return Optional.of(transientSnapshot);
+            lowerBoundSnapshotPosition,
+            exportedPosition);
+    transientSnapshot.ifPresent(this::takeSnapshot);
+    return transientSnapshot;
   }
 
   @Override
@@ -286,8 +279,8 @@ public class StateControllerImpl implements StateController, PersistedSnapshotLi
     return new ReplicationContext(metrics, startTimestamp, transientSnapshot);
   }
 
-  private long determineSnapshotPosition(final long lowerBoundSnapshotPosition) {
-    final long exportedPosition = exporterPositionSupplier.applyAsLong(openDb());
+  private long determineSnapshotPosition(
+      final long lowerBoundSnapshotPosition, final long exportedPosition) {
     final long snapshotPosition = Math.min(exportedPosition, lowerBoundSnapshotPosition);
     LOG.debug(
         "Based on lowest exporter position '{}' and last processed position '{}', determined '{}' as snapshot position.",

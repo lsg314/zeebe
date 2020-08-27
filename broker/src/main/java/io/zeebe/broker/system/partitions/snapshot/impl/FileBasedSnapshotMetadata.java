@@ -17,16 +17,27 @@ import org.slf4j.Logger;
 
 public final class FileBasedSnapshotMetadata implements SnapshotId {
   private static final Logger LOGGER = new ZbLogger(FileBasedSnapshotMetadata.class);
-  private static final int METADATA_PARTS = 3;
+  private static final int METADATA_PARTS = 5;
+  private static final int METADATA_PARTS_OLD_VERSION = 3;
 
   private final long index;
   private final long term;
   private final WallClockTimestamp timestamp;
+  private final long processedPosition;
+  private final long exporterPosition;
 
-  FileBasedSnapshotMetadata(final long index, final long term, final WallClockTimestamp timestamp) {
+  FileBasedSnapshotMetadata(
+      final long index,
+      final long term,
+      final WallClockTimestamp timestamp,
+      final long processedPosition,
+      final long exporterPosition) {
     this.index = index;
     this.term = term;
+    // We keep timestamp for backward compatibility
     this.timestamp = timestamp;
+    this.processedPosition = processedPosition;
+    this.exporterPosition = exporterPosition;
   }
 
   public static Optional<FileBasedSnapshotMetadata> ofPath(final Path path) {
@@ -42,15 +53,34 @@ public final class FileBasedSnapshotMetadata implements SnapshotId {
         final var index = Long.parseLong(parts[0]);
         final var term = Long.parseLong(parts[1]);
         final var timestamp = Long.parseLong(parts[2]);
+        final var processedPosition = Long.parseLong(parts[3]);
+        final var exporterPostion = Long.parseLong(parts[4]);
 
         metadata =
             Optional.of(
-                new FileBasedSnapshotMetadata(index, term, WallClockTimestamp.from(timestamp)));
+                new FileBasedSnapshotMetadata(
+                    index,
+                    term,
+                    WallClockTimestamp.from(timestamp),
+                    processedPosition,
+                    exporterPostion));
+      } catch (final NumberFormatException e) {
+        LOGGER.warn("Failed to parse part of snapshot metadata", e);
+      }
+    } else if (parts.length >= METADATA_PARTS_OLD_VERSION) {
+      try {
+        final var index = Long.parseLong(parts[0]);
+        final var term = Long.parseLong(parts[1]);
+        final var timestamp = Long.parseLong(parts[2]);
+
+        metadata =
+            Optional.of(
+                new FileBasedSnapshotMetadata(
+                    index, term, WallClockTimestamp.from(timestamp), 0, 0));
       } catch (final NumberFormatException e) {
         LOGGER.warn("Failed to parse part of snapshot metadata", e);
       }
     }
-
     return metadata;
   }
 
@@ -59,8 +89,19 @@ public final class FileBasedSnapshotMetadata implements SnapshotId {
     return index;
   }
 
+  @Override
   public long getTerm() {
     return term;
+  }
+
+  @Override
+  public long getProcessedPosition() {
+    return processedPosition;
+  }
+
+  @Override
+  public long getExportedPosition() {
+    return exporterPosition;
   }
 
   @Override
@@ -70,7 +111,13 @@ public final class FileBasedSnapshotMetadata implements SnapshotId {
 
   @Override
   public String getSnapshotIdAsString() {
-    return String.format("%d-%d-%d", getIndex(), getTerm(), getTimestamp().unixTimestamp());
+    return String.format(
+        "%d-%d-%d-%d-%d",
+        getIndex(),
+        getTerm(),
+        getTimestamp().unixTimestamp(),
+        getProcessedPosition(),
+        getExportedPosition());
   }
 
   @Override

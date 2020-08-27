@@ -20,6 +20,12 @@ public interface SnapshotId extends Comparable<SnapshotId> {
   /** @return the term when the snapshot was taken */
   long getTerm();
 
+  /** @return the processed position when the snapshot was taken */
+  long getProcessedPosition();
+
+  /** @return the exported position when the snapshot was taken */
+  long getExportedPosition();
+
   /** @return the timestamp when the snapshot was taken */
   WallClockTimestamp getTimestamp();
 

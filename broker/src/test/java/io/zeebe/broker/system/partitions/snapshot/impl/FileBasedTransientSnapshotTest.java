@@ -15,7 +15,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import io.atomix.raft.snapshot.PersistedSnapshotListener;
-import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.util.FileUtil;
 import java.io.File;
 import java.io.IOException;
@@ -58,10 +57,9 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
 
     // when
-    persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0);
 
     // then
     assertThat(pendingSnapshotsDir.toFile().listFiles()).isEmpty();
@@ -73,11 +71,10 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0);
 
     // when
-    transientSnapshot.abort();
+    transientSnapshot.orElseThrow().abort();
 
     // then
     assertThat(snapshotsDir.toFile().listFiles()).isEmpty();
@@ -88,9 +85,9 @@ public class FileBasedTransientSnapshotTest {
   public void shouldTakeTransientSnapshot() {
     // given
     final var index = 1L;
-    final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var term = 2L;
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 3, 4).orElseThrow();
 
     // when
     transientSnapshot.take(this::createSnapshotDir);
@@ -101,7 +98,12 @@ public class FileBasedTransientSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var pendingSnapshotDir = snapshotDirs[0];
-    assertThat(pendingSnapshotDir.getName()).isEqualTo("1-0-123");
+    final FileBasedSnapshotMetadata pendingSnapshotId =
+        FileBasedSnapshotMetadata.ofFileName(pendingSnapshotDir.getName()).orElseThrow();
+    assertThat(pendingSnapshotId.getIndex()).isEqualTo(1);
+    assertThat(pendingSnapshotId.getTerm()).isEqualTo(2);
+    assertThat(pendingSnapshotId.getProcessedPosition()).isEqualTo(3);
+    assertThat(pendingSnapshotId.getExportedPosition()).isEqualTo(4);
     assertThat(pendingSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -113,12 +115,11 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
-    transientSnapshot.take(this::createSnapshotDir);
+    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0);
+    transientSnapshot.orElseThrow().take(this::createSnapshotDir);
 
     // when
-    transientSnapshot.abort();
+    transientSnapshot.get().abort();
 
     // then
     assertThat(snapshotsDir.toFile().listFiles()).isEmpty();
@@ -130,9 +131,8 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
-    transientSnapshot.take(this::createSnapshotDir);
+    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0);
+    transientSnapshot.orElseThrow().take(this::createSnapshotDir);
 
     // when
     persistedSnapshotStore.purgePendingSnapshots();
@@ -147,10 +147,10 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     transientSnapshot.take(this::createSnapshotDir);
-    transientSnapshot.persist();
+    final var persistSnapshot = transientSnapshot.persist();
 
     // when
     persistedSnapshotStore.purgePendingSnapshots();
@@ -161,7 +161,7 @@ public class FileBasedTransientSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var pendingSnapshotDir = snapshotDirs[0];
-    assertThat(pendingSnapshotDir.getName()).isEqualTo("1-0-123");
+    assertThat(pendingSnapshotDir.getName()).isEqualTo(persistSnapshot.getId());
     assertThat(pendingSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -173,12 +173,11 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
-    transientSnapshot.take(this::createSnapshotDir);
+    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0);
+    transientSnapshot.orElseThrow().take(this::createSnapshotDir);
 
     // when
-    transientSnapshot.persist();
+    final var persistedSnapshot = transientSnapshot.get().persist();
 
     // then
     assertThat(pendingSnapshotsDir.toFile().listFiles()).isEmpty();
@@ -187,7 +186,7 @@ public class FileBasedTransientSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("1-0-123");
+    assertThat(committedSnapshotDir.getName()).isEqualTo(persistedSnapshot.getId());
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -199,13 +198,14 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var oldTransientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var oldTransientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     oldTransientSnapshot.take(this::createSnapshotDir);
     oldTransientSnapshot.persist();
 
     // when
-    final var newSnapshot = persistedSnapshotStore.newTransientSnapshot(index + 1, term, time);
+    final var newSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index + 1, term, 1, 0).orElseThrow();
     newSnapshot.take(this::createSnapshotDir);
     newSnapshot.persist();
 
@@ -216,7 +216,11 @@ public class FileBasedTransientSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("2-0-123");
+    assertThat(
+            FileBasedSnapshotMetadata.ofFileName(committedSnapshotDir.getName())
+                .orElseThrow()
+                .getIndex())
+        .isEqualTo(2);
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -228,12 +232,13 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var oldTransientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var oldTransientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     oldTransientSnapshot.take(this::createSnapshotDir);
 
     // when
-    final var newSnapshot = persistedSnapshotStore.newTransientSnapshot(index + 1, term, time);
+    final var newSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index + 1, term, 1, 0).orElseThrow();
     newSnapshot.take(this::createSnapshotDir);
     newSnapshot.persist();
 
@@ -244,7 +249,11 @@ public class FileBasedTransientSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("2-0-123");
+    assertThat(
+            FileBasedSnapshotMetadata.ofFileName(committedSnapshotDir.getName())
+                .orElseThrow()
+                .getIndex())
+        .isEqualTo(2);
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -256,22 +265,26 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
     final var oldTransientSnapshot =
-        persistedSnapshotStore.newTransientSnapshot(index + 1, term, time);
+        persistedSnapshotStore.newTransientSnapshot(index + 1, term, 1, 0).orElseThrow();
     oldTransientSnapshot.take(this::createSnapshotDir);
 
     // when
-    final var newSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var newSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     newSnapshot.take(this::createSnapshotDir);
-    newSnapshot.persist();
+    final var newSnapshotId = newSnapshot.persist().getId();
 
     // then
-    final var pendinngSnapshotDirs = pendingSnapshotsDir.toFile().listFiles();
-    assertThat(pendinngSnapshotDirs).isNotNull().hasSize(1);
+    final var pendingSnapshotDirs = pendingSnapshotsDir.toFile().listFiles();
+    assertThat(pendingSnapshotDirs).isNotNull().hasSize(1);
 
-    final var pendingSnapshotDir = pendinngSnapshotDirs[0];
-    assertThat(pendingSnapshotDir.getName()).isEqualTo("2-0-123");
+    final var pendingSnapshotDir = pendingSnapshotDirs[0];
+    assertThat(
+            FileBasedSnapshotMetadata.ofFileName(pendingSnapshotDir.getName())
+                .orElseThrow()
+                .getIndex())
+        .isEqualTo(2);
     assertThat(pendingSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -281,7 +294,7 @@ public class FileBasedTransientSnapshotTest {
     assertThat(snapshotDirs).isNotNull().hasSize(1);
 
     final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("1-0-123");
+    assertThat(committedSnapshotDir.getName()).isEqualTo(newSnapshotId);
     assertThat(committedSnapshotDir.listFiles())
         .isNotNull()
         .extracting(File::getName)
@@ -293,8 +306,8 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var oldTransientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var oldTransientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
 
     // when
     oldTransientSnapshot.take(
@@ -317,8 +330,8 @@ public class FileBasedTransientSnapshotTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var oldTransientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var oldTransientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
 
     // when
     oldTransientSnapshot.take(
@@ -342,8 +355,8 @@ public class FileBasedTransientSnapshotTest {
     final var listener = mock(PersistedSnapshotListener.class);
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     persistedSnapshotStore.addSnapshotListener(listener);
     transientSnapshot.take(this::createSnapshotDir);
 
@@ -362,8 +375,8 @@ public class FileBasedTransientSnapshotTest {
     final var listener = mock(PersistedSnapshotListener.class);
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).orElseThrow();
     persistedSnapshotStore.addSnapshotListener(listener);
     persistedSnapshotStore.removeSnapshotListener(listener);
     transientSnapshot.take(this::createSnapshotDir);
@@ -378,33 +391,25 @@ public class FileBasedTransientSnapshotTest {
   }
 
   @Test
-  public void shouldReturnExistingIfSnapshotAlreadyExists() {
+  public void shouldNotTakeSnapshotIfIdAlreadyExists() {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var processedPosition = 2;
+    final var exporterPosition = 3;
+    final var transientSnapshot =
+        persistedSnapshotStore
+            .newTransientSnapshot(index, term, processedPosition, exporterPosition)
+            .orElseThrow();
     transientSnapshot.take(this::createSnapshotDir);
-    final var persistedSnapshot = transientSnapshot.persist();
-
     // when
-    final var transientSnapshot2 = persistedSnapshotStore.newTransientSnapshot(index, term, time);
-    transientSnapshot2.take(this::createSnapshotDir);
-    final var persistedSnapshot2 = transientSnapshot2.persist();
+    transientSnapshot.persist();
 
     // then
-    assertThat(pendingSnapshotsDir.toFile().listFiles()).isEmpty();
-
-    final var snapshotDirs = snapshotsDir.toFile().listFiles();
-    assertThat(snapshotDirs).isNotNull().hasSize(1);
-
-    final var committedSnapshotDir = snapshotDirs[0];
-    assertThat(committedSnapshotDir.getName()).isEqualTo("1-0-123");
-    assertThat(committedSnapshotDir.listFiles())
-        .isNotNull()
-        .extracting(File::getName)
-        .containsExactly("file1.txt");
-    assertThat(persistedSnapshot).isEqualTo(persistedSnapshot2);
+    assertThat(
+            persistedSnapshotStore.newTransientSnapshot(
+                index, term, processedPosition, exporterPosition))
+        .isEmpty();
   }
 
   private boolean createSnapshotDir(final Path path) {

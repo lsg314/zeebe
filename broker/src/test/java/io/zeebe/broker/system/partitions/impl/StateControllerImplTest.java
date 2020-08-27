@@ -10,6 +10,7 @@ package io.zeebe.broker.system.partitions.impl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.atomix.raft.snapshot.PersistableSnapshot;
 import io.atomix.raft.snapshot.PersistedSnapshot;
 import io.atomix.raft.snapshot.TransientSnapshot;
 import io.atomix.raft.zeebe.ZeebeEntry;
@@ -143,6 +144,28 @@ public final class StateControllerImplTest {
 
     // then
     assertThat(wrapper.getInt(key)).isEqualTo(value);
+  }
+
+  @Test
+  public void shouldTakeSnapshotWhenExporterPositionNotChanged() {
+    // given
+    final var snapshotPosition = 2;
+    exporterPosition.set(snapshotPosition - 1);
+    snapshotController.openDb();
+    final var firstSnapshot =
+        snapshotController
+            .takeTransientSnapshot(snapshotPosition)
+            .map(PersistableSnapshot::persist)
+            .orElseThrow();
+
+    // when
+    final var tmpSnapshot = snapshotController.takeTransientSnapshot(snapshotPosition + 1);
+    final var snapshot = tmpSnapshot.map(TransientSnapshot::persist).orElseThrow();
+
+    // then
+    assertThat(snapshot)
+        .extracting(PersistedSnapshot::getCompactionBound)
+        .isEqualTo(firstSnapshot.getCompactionBound());
   }
 
   @Test

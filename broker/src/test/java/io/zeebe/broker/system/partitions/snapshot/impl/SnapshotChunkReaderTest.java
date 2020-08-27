@@ -55,8 +55,8 @@ public class SnapshotChunkReaderTest {
     // given
     final var index = 1L;
     final var term = 0L;
-    final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -87,9 +87,20 @@ public class SnapshotChunkReaderTest {
     final var expectedSnapshotChecksum = ChecksumUtil.createCombinedChecksum(paths);
 
     // chunks should always read in order
-    assertSnapshotChunk(expectedSnapshotChecksum, snapshotChunks.get(0), "file1", "this");
-    assertSnapshotChunk(expectedSnapshotChecksum, snapshotChunks.get(1), "file2", "is");
-    assertSnapshotChunk(expectedSnapshotChecksum, snapshotChunks.get(2), "file3", "content");
+    assertSnapshotChunk(
+        expectedSnapshotChecksum,
+        snapshotChunks.get(0),
+        "file1",
+        "this",
+        persistedSnapshot.getId());
+    assertSnapshotChunk(
+        expectedSnapshotChecksum, snapshotChunks.get(1), "file2", "is", persistedSnapshot.getId());
+    assertSnapshotChunk(
+        expectedSnapshotChecksum,
+        snapshotChunks.get(2),
+        "file3",
+        "content",
+        persistedSnapshot.getId());
   }
 
   @Test
@@ -98,7 +109,8 @@ public class SnapshotChunkReaderTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -129,8 +141,14 @@ public class SnapshotChunkReaderTest {
     final var expectedSnapshotChecksum = ChecksumUtil.createCombinedChecksum(paths);
 
     // chunks should always read in order
-    assertSnapshotChunk(expectedSnapshotChecksum, snapshotChunks.get(0), "file2", "is");
-    assertSnapshotChunk(expectedSnapshotChecksum, snapshotChunks.get(1), "file3", "content");
+    assertSnapshotChunk(
+        expectedSnapshotChecksum, snapshotChunks.get(0), "file2", "is", persistedSnapshot.getId());
+    assertSnapshotChunk(
+        expectedSnapshotChecksum,
+        snapshotChunks.get(1),
+        "file3",
+        "content",
+        persistedSnapshot.getId());
   }
 
   @Test
@@ -139,7 +157,8 @@ public class SnapshotChunkReaderTest {
     final var index = 1L;
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
-    final var transientSnapshot = persistedSnapshotStore.newTransientSnapshot(index, term, time);
+    final var transientSnapshot =
+        persistedSnapshotStore.newTransientSnapshot(index, term, 1, 0).get();
     transientSnapshot.take(
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
@@ -161,8 +180,9 @@ public class SnapshotChunkReaderTest {
       final long expectedSnapshotChecksum,
       final SnapshotChunk snapshotChunk,
       final String fileName,
-      final String chunkContent) {
-    assertThat(snapshotChunk.getSnapshotId()).isEqualTo("1-0-123");
+      final String chunkContent,
+      final String snapshotId) {
+    assertThat(snapshotChunk.getSnapshotId()).isEqualTo(snapshotId);
     assertThat(snapshotChunk.getChunkName()).isEqualTo(fileName);
     assertThat(snapshotChunk.getContent()).isEqualTo(chunkContent.getBytes());
     assertThat(snapshotChunk.getTotalCount()).isEqualTo(3);

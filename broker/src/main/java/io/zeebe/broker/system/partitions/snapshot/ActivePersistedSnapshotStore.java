@@ -9,9 +9,10 @@ package io.zeebe.broker.system.partitions.snapshot;
 
 import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.raft.snapshot.TransientSnapshot;
-import io.atomix.utils.time.WallClockTimestamp;
+import java.util.Optional;
 
 /** A persisted snapshot store than can create a new snapshot and persists it. */
 public interface ActivePersistedSnapshotStore extends PersistedSnapshotStore {
-  TransientSnapshot newTransientSnapshot(long index, long term, WallClockTimestamp timestamp);
+  Optional<TransientSnapshot> newTransientSnapshot(
+      long index, long term, long processedPosition, long exportedPosition);
 }
