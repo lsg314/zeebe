@@ -19,12 +19,12 @@ import static org.mockito.Mockito.when;
 
 import io.atomix.raft.snapshot.PersistedSnapshot;
 import io.atomix.raft.snapshot.PersistedSnapshotStore;
-import io.atomix.raft.snapshot.impl.FileBasedSnapshotStoreFactory;
 import io.atomix.raft.zeebe.ZeebeEntry;
 import io.atomix.storage.journal.Indexed;
 import io.zeebe.broker.system.partitions.impl.AsyncSnapshotDirector;
 import io.zeebe.broker.system.partitions.impl.NoneSnapshotReplication;
 import io.zeebe.broker.system.partitions.impl.StateControllerImpl;
+import io.zeebe.broker.system.partitions.snapshot.impl.FileBasedSnapshotStoreFactory;
 import io.zeebe.db.impl.DefaultColumnFamily;
 import io.zeebe.db.impl.rocksdb.ZeebeRocksDbFactory;
 import io.zeebe.engine.processing.streamprocessor.StreamProcessor;

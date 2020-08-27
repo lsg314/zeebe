@@ -10,13 +10,13 @@ package io.zeebe.broker.logstreams;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.atomix.raft.snapshot.impl.FileBasedSnapshotStore;
-import io.atomix.raft.snapshot.impl.SnapshotMetrics;
 import io.atomix.raft.storage.RaftStorage;
 import io.atomix.raft.storage.log.RaftLogReader;
 import io.atomix.storage.journal.Indexed;
 import io.atomix.storage.journal.JournalSegmentDescriptor;
 import io.atomix.utils.time.WallClockTimestamp;
+import io.zeebe.broker.system.partitions.snapshot.impl.FileBasedSnapshotStore;
+import io.zeebe.broker.system.partitions.snapshot.impl.SnapshotMetrics;
 import io.zeebe.logstreams.util.AtomixLogStorageRule;
 import io.zeebe.util.FileUtil;
 import io.zeebe.util.sched.testing.ActorSchedulerRule;

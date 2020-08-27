@@ -9,10 +9,10 @@ package io.zeebe.broker.it.clustering;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.atomix.raft.snapshot.impl.FileBasedSnapshotMetadata;
 import io.zeebe.broker.Broker;
 import io.zeebe.broker.it.util.GrpcClientRule;
 import io.zeebe.broker.system.configuration.BrokerCfg;
+import io.zeebe.broker.system.partitions.snapshot.impl.FileBasedSnapshotMetadata;
 import io.zeebe.client.ZeebeClient;
 import io.zeebe.model.bpmn.Bpmn;
 import io.zeebe.model.bpmn.BpmnModelInstance;

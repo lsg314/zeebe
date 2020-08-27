@@ -5,7 +5,7 @@
  * Licensed under the Zeebe Community License 1.0. You may not use this file
  * except in compliance with the Zeebe Community License 1.0.
  */
-package io.atomix.raft.snapshot.impl;
+package io.zeebe.broker.system.partitions.snapshot.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.NavigableSet;
 import java.util.TreeSet;
-import org.assertj.core.api.Assertions;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -35,9 +34,9 @@ public final class FileBasedSnapshotChunkReaderTest {
     reader.seek(null);
 
     // then
-    Assertions.assertThat(reader).hasNext();
-    Assertions.assertThat(reader.next().getChunkName()).isEqualTo("bar");
-    Assertions.assertThat(reader.nextId()).isEqualTo(asBuffer("foo"));
+    assertThat(reader).hasNext();
+    assertThat(reader.next().getChunkName()).isEqualTo("bar");
+    assertThat(reader.nextId()).isEqualTo(asBuffer("foo"));
   }
 
   @Test
@@ -49,9 +48,9 @@ public final class FileBasedSnapshotChunkReaderTest {
     reader.seek(asBuffer("foo"));
 
     // then
-    Assertions.assertThat(reader).hasNext();
-    Assertions.assertThat(reader.next().getChunkName()).isEqualTo("foo");
-    Assertions.assertThat(reader.nextId()).isEqualTo(null);
+    assertThat(reader).hasNext();
+    assertThat(reader.next().getChunkName()).isEqualTo("foo");
+    assertThat(reader.nextId()).isEqualTo(null);
   }
 
   @Test
@@ -67,8 +66,8 @@ public final class FileBasedSnapshotChunkReaderTest {
 
     // then
     assertThat(chunks).extracting(SnapshotChunk::getChunkName).containsExactly("a", "b", "c");
-    Assertions.assertThat(reader.nextId()).isEqualTo(null);
-    Assertions.assertThat(reader.hasNext()).isFalse();
+    assertThat(reader.nextId()).isEqualTo(null);
+    assertThat(reader.hasNext()).isFalse();
   }
 
   private ByteBuffer asBuffer(final CharSequence chunk) {
