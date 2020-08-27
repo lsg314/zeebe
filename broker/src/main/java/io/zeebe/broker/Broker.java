@@ -13,6 +13,7 @@ import io.atomix.cluster.messaging.impl.NettyMessagingService;
 import io.atomix.core.Atomix;
 import io.atomix.raft.partition.RaftPartition;
 import io.atomix.raft.partition.RaftPartitionGroup;
+import io.atomix.raft.snapshot.impl.FileBasedSnapshotStoreFactory;
 import io.atomix.utils.net.Address;
 import io.zeebe.broker.bootstrap.CloseProcess;
 import io.zeebe.broker.bootstrap.StartProcess;
@@ -88,6 +89,7 @@ public final class Broker implements AutoCloseable {
   private final List<DiskSpaceUsageListener> diskSpaceUsageListeners = new ArrayList<>();
   private final SpringBrokerBridge springBrokerBridge;
   private DiskSpaceUsageMonitor diskSpaceUsageMonitor;
+  private FileBasedSnapshotStoreFactory snapshotStoreFactory;
 
   public Broker(final SystemContext systemContext, final SpringBrokerBridge springBrokerBridge) {
     brokerContext = systemContext;
@@ -195,7 +197,8 @@ public final class Broker implements AutoCloseable {
   }
 
   private AutoCloseable atomixCreateStep(final BrokerCfg brokerCfg) {
-    atomix = AtomixFactory.fromConfiguration(brokerCfg);
+    snapshotStoreFactory = new FileBasedSnapshotStoreFactory();
+    atomix = AtomixFactory.fromConfiguration(brokerCfg, snapshotStoreFactory);
 
     final var partitionGroup =
         (RaftPartitionGroup)

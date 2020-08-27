@@ -21,7 +21,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import io.atomix.raft.snapshot.PersistedSnapshotStore;
-import io.atomix.raft.snapshot.impl.FileBasedSnapshotStoreFactory;
 import io.atomix.raft.storage.log.RaftLog;
 import io.atomix.raft.storage.log.entry.RaftLogEntry;
 import io.atomix.raft.storage.system.MetaStore;
@@ -631,11 +630,6 @@ public final class RaftStorage {
      */
     @Override
     public RaftStorage build() {
-      if (persistedSnapshotStore == null) {
-        persistedSnapshotStore =
-            new FileBasedSnapshotStoreFactory().createSnapshotStore(directory.toPath(), prefix);
-      }
-
       return new RaftStorage(
           prefix,
           storageLevel,
