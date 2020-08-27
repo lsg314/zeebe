@@ -503,6 +503,8 @@ abstract class AbstractAppender implements AutoCloseable {
           persistedSnapshot.getId(),
           member.getMember().memberId(),
           e);
+      // If snapshot was deleted, a new reader should be created with the new snapshot
+      member.setNextSnapshotIndex(0);
       return Optional.empty();
     }
   }
