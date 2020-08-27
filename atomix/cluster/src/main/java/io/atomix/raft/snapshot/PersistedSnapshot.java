@@ -84,5 +84,5 @@ public interface PersistedSnapshot extends CloseableSilently {
   long getCompactionBound();
 
   /** @return the identifier of the snapshot */
-  SnapshotId getId();
+  String getId();
 }

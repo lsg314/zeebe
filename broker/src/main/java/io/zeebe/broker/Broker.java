@@ -344,6 +344,7 @@ public final class Broker implements AutoCloseable {
                     brokerCfg,
                     commandHandler,
                     partitionIndexes.get(partitionId),
+                    snapshotStoreFactory.getSnapshotStore(owningPartition.name()),
                     createFactory(topologyManager, clusterCfg, atomix, managementRequestHandler));
             scheduleActor(zeebePartition);
             healthCheckService.registerMonitoredPartition(

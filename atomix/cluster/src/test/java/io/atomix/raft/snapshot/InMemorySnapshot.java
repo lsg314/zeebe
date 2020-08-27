@@ -145,28 +145,8 @@ public class InMemorySnapshot implements PersistedSnapshot, ReceivedSnapshot {
   }
 
   @Override
-  public SnapshotId getId() {
-    return new SnapshotId() {
-      @Override
-      public long getIndex() {
-        return index;
-      }
-
-      @Override
-      public long getTerm() {
-        return term;
-      }
-
-      @Override
-      public WallClockTimestamp getTimestamp() {
-        return timestamp;
-      }
-
-      @Override
-      public String getSnapshotIdAsString() {
-        return id;
-      }
-    };
+  public String getId() {
+    return id;
   }
 
   private String byteBufferToString(final ByteBuffer buf) {

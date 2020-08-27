@@ -15,7 +15,6 @@
  */
 package io.atomix.raft.snapshot;
 
-import io.atomix.utils.time.WallClockTimestamp;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -36,12 +35,6 @@ public class TestSnapshotStore implements PersistedSnapshotStore {
   public boolean hasSnapshotId(final String id) {
     return currentPersistedSnapshot.get() != null
         && currentPersistedSnapshot.get().getId().equals(id);
-  }
-
-  @Override
-  public TransientSnapshot newTransientSnapshot(
-      final long index, final long term, final WallClockTimestamp timestamp) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

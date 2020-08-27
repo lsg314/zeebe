@@ -17,7 +17,6 @@
 
 package io.atomix.raft.snapshot;
 
-import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.util.CloseableSilently;
 import java.io.IOException;
 import java.util.Optional;
@@ -43,17 +42,6 @@ public interface PersistedSnapshotStore extends CloseableSilently {
    * @see SnapshotId#getSnapshotIdAsString()
    */
   boolean hasSnapshotId(String id);
-
-  /**
-   * Starts a new transient snapshot which can be persisted after the snapshot was taken.
-   *
-   * @param index the index to which the snapshot corresponds to
-   * @param term the term to which the snapshots corresponds to
-   * @param timestamp the time to which the snapshots corresponds to
-   * @return the new transient snapshot
-   */
-  TransientSnapshot newTransientSnapshot(
-      final long index, final long term, final WallClockTimestamp timestamp);
 
   /**
    * Starts a new received volatile snapshot which can be persisted later.

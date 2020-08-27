@@ -5,8 +5,9 @@
  * Licensed under the Zeebe Community License 1.0. You may not use this file
  * except in compliance with the Zeebe Community License 1.0.
  */
-package io.atomix.raft.snapshot;
+package io.zeebe.broker.system.partitions.snapshot;
 
+import io.atomix.raft.snapshot.PersistedSnapshot;
 import io.atomix.utils.time.WallClockTimestamp;
 import java.util.Comparator;
 

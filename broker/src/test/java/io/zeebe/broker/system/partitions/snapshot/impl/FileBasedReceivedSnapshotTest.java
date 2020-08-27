@@ -21,7 +21,6 @@ import static org.mockito.Mockito.verify;
 
 import io.atomix.raft.snapshot.PersistedSnapshot;
 import io.atomix.raft.snapshot.PersistedSnapshotListener;
-import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.raft.snapshot.ReceivedSnapshot;
 import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.util.FileUtil;
@@ -42,22 +41,26 @@ import org.junit.rules.TemporaryFolder;
 public class FileBasedReceivedSnapshotTest {
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
-  private PersistedSnapshotStore senderSnapshotStore;
-  private PersistedSnapshotStore receiverSnapshotStore;
+  private FileBasedSnapshotStore senderSnapshotStore;
+  private FileBasedSnapshotStore receiverSnapshotStore;
   private Path receiverSnapshotsDir;
   private Path receiverPendingSnapshotsDir;
-  private FileBasedSnapshotStoreFactory factory;
 
   @Before
   public void before() throws Exception {
-    factory = new FileBasedSnapshotStoreFactory();
     final String partitionName = "1";
     final File senderRoot = temporaryFolder.newFolder("sender");
 
-    senderSnapshotStore = factory.createSnapshotStore(senderRoot.toPath(), partitionName);
+    senderSnapshotStore =
+        (FileBasedSnapshotStore)
+            new FileBasedSnapshotStoreFactory()
+                .createSnapshotStore(senderRoot.toPath(), partitionName);
 
     final var receiverRoot = temporaryFolder.newFolder("received");
-    receiverSnapshotStore = factory.createSnapshotStore(receiverRoot.toPath(), partitionName);
+    receiverSnapshotStore =
+        (FileBasedSnapshotStore)
+            new FileBasedSnapshotStoreFactory()
+                .createSnapshotStore(receiverRoot.toPath(), partitionName);
 
     receiverSnapshotsDir =
         receiverRoot.toPath().resolve(FileBasedSnapshotStoreFactory.SNAPSHOTS_DIRECTORY);
@@ -108,8 +111,7 @@ public class FileBasedReceivedSnapshotTest {
     final PersistedSnapshot persistedSnapshot = takeSnapshot(index, term, time);
 
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       while (snapshotChunkReader.hasNext()) {
         receivedSnapshot.apply(snapshotChunkReader.next());
@@ -248,8 +250,10 @@ public class FileBasedReceivedSnapshotTest {
     final var term = 0L;
     final var time = WallClockTimestamp.from(123);
 
-    final var otherStore =
-        factory.createSnapshotStore(temporaryFolder.newFolder("other").toPath(), "1");
+    final FileBasedSnapshotStore otherStore =
+        (FileBasedSnapshotStore)
+            new FileBasedSnapshotStoreFactory()
+                .createSnapshotStore(temporaryFolder.newFolder("other").toPath(), "1");
     final var olderTransient = otherStore.newTransientSnapshot(index, term, time);
     olderTransient.take(this::takeSnapshot);
     final var olderPersistedSnapshot = olderTransient.persist();
@@ -423,8 +427,7 @@ public class FileBasedReceivedSnapshotTest {
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       while (snapshotChunkReader.hasNext()) {
         receivedSnapshot.apply(withDifferentSnapshotChecksum(snapshotChunkReader.next(), 0xCAFEL));
@@ -453,8 +456,7 @@ public class FileBasedReceivedSnapshotTest {
 
     // when
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
 
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       var success = receivedSnapshot.apply(snapshotChunkReader.next());
@@ -481,8 +483,7 @@ public class FileBasedReceivedSnapshotTest {
 
     // when
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
 
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       final var success =
@@ -504,8 +505,7 @@ public class FileBasedReceivedSnapshotTest {
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       while (snapshotChunkReader.hasNext()) {
         receivedSnapshot.apply(withDifferentSnapshotChecksum(snapshotChunkReader.next(), 0xCAFEL));
@@ -529,8 +529,7 @@ public class FileBasedReceivedSnapshotTest {
 
     // when
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
 
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       var success = receivedSnapshot.apply(snapshotChunkReader.next());
@@ -553,8 +552,7 @@ public class FileBasedReceivedSnapshotTest {
         p -> takeSnapshot(p, List.of("file3", "file1", "file2"), List.of("content", "this", "is")));
     final var persistedSnapshot = transientSnapshot.persist();
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       while (snapshotChunkReader.hasNext()) {
         receivedSnapshot.apply(withDifferentTotalCount(snapshotChunkReader.next(), 2));
@@ -578,8 +576,7 @@ public class FileBasedReceivedSnapshotTest {
 
     // when
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
 
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       var success = receivedSnapshot.apply(snapshotChunkReader.next());
@@ -608,8 +605,7 @@ public class FileBasedReceivedSnapshotTest {
   private ReceivedSnapshot receiveSnapshot(final PersistedSnapshot persistedSnapshot)
       throws IOException {
     final var receivedSnapshot =
-        receiverSnapshotStore.newReceivedSnapshot(
-            persistedSnapshot.getId().getSnapshotIdAsString());
+        receiverSnapshotStore.newReceivedSnapshot(persistedSnapshot.getId());
 
     try (final var snapshotChunkReader = persistedSnapshot.newChunkReader()) {
       while (snapshotChunkReader.hasNext()) {

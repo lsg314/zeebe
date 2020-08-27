@@ -86,6 +86,11 @@
       <groupId>io.zeebe</groupId>
       <artifactId>atomix-cluster</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.zeebe</groupId>
+      <artifactId>atomix-utils</artifactId>
+      <version>0.25.0-SNAPSHOT</version>
+    </dependency>
   </dependencies>
 
   <build>

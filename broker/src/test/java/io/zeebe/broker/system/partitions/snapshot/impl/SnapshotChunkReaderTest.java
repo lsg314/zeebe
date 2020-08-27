@@ -11,7 +11,6 @@ import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.raft.snapshot.SnapshotChunk;
 import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.protocol.Protocol;
@@ -39,7 +38,7 @@ import org.junit.rules.TemporaryFolder;
 public class SnapshotChunkReaderTest {
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
-  private PersistedSnapshotStore persistedSnapshotStore;
+  private FileBasedSnapshotStore persistedSnapshotStore;
 
   @Before
   public void before() {
@@ -47,7 +46,8 @@ public class SnapshotChunkReaderTest {
     final String partitionName = "1";
     final File root = temporaryFolder.getRoot();
 
-    persistedSnapshotStore = factory.createSnapshotStore(root.toPath(), partitionName);
+    persistedSnapshotStore =
+        (FileBasedSnapshotStore) factory.createSnapshotStore(root.toPath(), partitionName);
   }
 
   @Test

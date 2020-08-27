@@ -9,10 +9,10 @@ package io.zeebe.broker.system.partitions.snapshot.impl;
 
 import io.atomix.raft.snapshot.PersistedSnapshot;
 import io.atomix.raft.snapshot.PersistedSnapshotListener;
-import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.raft.snapshot.ReceivedSnapshot;
 import io.atomix.raft.snapshot.TransientSnapshot;
 import io.atomix.utils.time.WallClockTimestamp;
+import io.zeebe.broker.system.partitions.snapshot.ActivePersistedSnapshotStore;
 import io.zeebe.util.FileUtil;
 import io.zeebe.util.ZbLogger;
 import java.io.IOException;
@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 
-public final class FileBasedSnapshotStore implements PersistedSnapshotStore {
+public final class FileBasedSnapshotStore implements ActivePersistedSnapshotStore {
   // first is the metadata and the second the the received snapshot count
   private static final String RECEIVING_DIR_FORMAT = "%s-%d";
 
@@ -45,7 +45,7 @@ public final class FileBasedSnapshotStore implements PersistedSnapshotStore {
 
   private final SnapshotMetrics snapshotMetrics;
 
-  private final AtomicReference<PersistedSnapshot> currentPersistedSnapshotRef;
+  private final AtomicReference<FileBasedSnapshot> currentPersistedSnapshotRef;
   // used to write concurrently received snapshots in different pending directories
   private final AtomicLong receivingSnapshotStartCount;
 
@@ -64,8 +64,8 @@ public final class FileBasedSnapshotStore implements PersistedSnapshotStore {
     currentPersistedSnapshotRef = new AtomicReference<>(loadLatestSnapshot(snapshotsDirectory));
   }
 
-  private PersistedSnapshot loadLatestSnapshot(final Path snapshotDirectory) {
-    PersistedSnapshot latestPersistedSnapshot = null;
+  private FileBasedSnapshot loadLatestSnapshot(final Path snapshotDirectory) {
+    FileBasedSnapshot latestPersistedSnapshot = null;
     try (final var stream = Files.newDirectoryStream(snapshotDirectory)) {
       for (final var path : stream) {
         latestPersistedSnapshot = collectSnapshot(path);
@@ -76,7 +76,7 @@ public final class FileBasedSnapshotStore implements PersistedSnapshotStore {
     return latestPersistedSnapshot;
   }
 
-  private PersistedSnapshot collectSnapshot(final Path path) {
+  private FileBasedSnapshot collectSnapshot(final Path path) {
     final var optionalMeta = FileBasedSnapshotMetadata.ofPath(path);
     if (optionalMeta.isPresent()) {
       final var metadata = optionalMeta.get();
@@ -235,7 +235,7 @@ public final class FileBasedSnapshotStore implements PersistedSnapshotStore {
 
   private boolean isCurrentSnapshotNewer(final FileBasedSnapshotMetadata metadata) {
     final var persistedSnapshot = currentPersistedSnapshotRef.get();
-    return (persistedSnapshot != null && persistedSnapshot.getId().compareTo(metadata) >= 0);
+    return (persistedSnapshot != null && persistedSnapshot.getMetadata().compareTo(metadata) >= 0);
   }
 
   PersistedSnapshot newSnapshot(final FileBasedSnapshotMetadata metadata, final Path directory) {

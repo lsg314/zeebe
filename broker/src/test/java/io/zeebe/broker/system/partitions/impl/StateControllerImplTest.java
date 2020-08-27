@@ -11,10 +11,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.atomix.raft.snapshot.PersistedSnapshot;
-import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.raft.snapshot.TransientSnapshot;
 import io.atomix.raft.zeebe.ZeebeEntry;
 import io.atomix.storage.journal.Indexed;
+import io.zeebe.broker.system.partitions.snapshot.impl.FileBasedSnapshotStore;
 import io.zeebe.broker.system.partitions.snapshot.impl.FileBasedSnapshotStoreFactory;
 import io.zeebe.db.impl.DefaultColumnFamily;
 import io.zeebe.db.impl.rocksdb.ZeebeRocksDbFactory;
@@ -39,12 +39,14 @@ public final class StateControllerImplTest {
 
   private final MutableLong exporterPosition = new MutableLong(Long.MAX_VALUE);
   private StateControllerImpl snapshotController;
-  private PersistedSnapshotStore store;
+  private FileBasedSnapshotStore store;
 
   @Before
   public void setup() throws IOException {
     final var rootDirectory = tempFolderRule.newFolder("state").toPath();
-    store = new FileBasedSnapshotStoreFactory().createSnapshotStore(rootDirectory, "1");
+    store =
+        (FileBasedSnapshotStore)
+            new FileBasedSnapshotStoreFactory().createSnapshotStore(rootDirectory, "1");
 
     snapshotController =
         new StateControllerImpl(

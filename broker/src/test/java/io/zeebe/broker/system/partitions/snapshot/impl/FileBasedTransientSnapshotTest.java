@@ -15,7 +15,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import io.atomix.raft.snapshot.PersistedSnapshotListener;
-import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.util.FileUtil;
 import java.io.File;
@@ -32,7 +31,7 @@ import org.junit.rules.TemporaryFolder;
 public class FileBasedTransientSnapshotTest {
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
-  private PersistedSnapshotStore persistedSnapshotStore;
+  private FileBasedSnapshotStore persistedSnapshotStore;
   private Path snapshotsDir;
   private Path pendingSnapshotsDir;
 
@@ -42,7 +41,8 @@ public class FileBasedTransientSnapshotTest {
     final String partitionName = "1";
     final File root = temporaryFolder.getRoot();
 
-    persistedSnapshotStore = factory.createSnapshotStore(root.toPath(), partitionName);
+    persistedSnapshotStore =
+        (FileBasedSnapshotStore) factory.createSnapshotStore(root.toPath(), partitionName);
 
     snapshotsDir =
         temporaryFolder

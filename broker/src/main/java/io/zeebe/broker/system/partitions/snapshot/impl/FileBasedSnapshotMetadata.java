@@ -7,8 +7,8 @@
  */
 package io.zeebe.broker.system.partitions.snapshot.impl;
 
-import io.atomix.raft.snapshot.SnapshotId;
 import io.atomix.utils.time.WallClockTimestamp;
+import io.zeebe.broker.system.partitions.snapshot.SnapshotId;
 import io.zeebe.util.ZbLogger;
 import java.nio.file.Path;
 import java.util.Objects;

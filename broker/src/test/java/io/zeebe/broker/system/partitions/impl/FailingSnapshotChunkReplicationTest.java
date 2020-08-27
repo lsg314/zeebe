@@ -9,12 +9,12 @@ package io.zeebe.broker.system.partitions.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.raft.snapshot.SnapshotChunk;
 import io.atomix.raft.snapshot.TransientSnapshot;
 import io.atomix.raft.zeebe.ZeebeEntry;
 import io.atomix.storage.journal.Indexed;
 import io.zeebe.broker.system.partitions.SnapshotReplication;
+import io.zeebe.broker.system.partitions.snapshot.impl.FileBasedSnapshotStore;
 import io.zeebe.broker.system.partitions.snapshot.impl.FileBasedSnapshotStoreFactory;
 import io.zeebe.db.impl.DefaultColumnFamily;
 import io.zeebe.db.impl.rocksdb.ZeebeRocksDbFactory;
@@ -35,15 +35,19 @@ public final class FailingSnapshotChunkReplicationTest {
 
   private StateControllerImpl replicatorSnapshotController;
   private StateControllerImpl receiverSnapshotController;
-  private PersistedSnapshotStore senderStore;
-  private PersistedSnapshotStore receiverStore;
+  private FileBasedSnapshotStore senderStore;
+  private FileBasedSnapshotStore receiverStore;
 
   public void setup(final SnapshotReplication replicator) throws IOException {
     final var senderRoot = tempFolderRule.newFolder("sender").toPath();
-    senderStore = new FileBasedSnapshotStoreFactory().createSnapshotStore(senderRoot, "1");
+    senderStore =
+        (FileBasedSnapshotStore)
+            new FileBasedSnapshotStoreFactory().createSnapshotStore(senderRoot, "1");
 
     final var receiverRoot = tempFolderRule.newFolder("receiver").toPath();
-    receiverStore = new FileBasedSnapshotStoreFactory().createSnapshotStore(receiverRoot, "1");
+    receiverStore =
+        (FileBasedSnapshotStore)
+            new FileBasedSnapshotStoreFactory().createSnapshotStore(receiverRoot, "1");
 
     replicatorSnapshotController =
         new StateControllerImpl(
@@ -53,7 +57,7 @@ public final class FailingSnapshotChunkReplicationTest {
             senderRoot.resolve("runtime"),
             replicator,
             l ->
-                Optional.ofNullable(
+                Optional.of(
                     new Indexed(l, new ZeebeEntry(1, System.currentTimeMillis(), 1, 10, null), 0)),
             db -> Long.MAX_VALUE);
     senderStore.addSnapshotListener(replicatorSnapshotController);

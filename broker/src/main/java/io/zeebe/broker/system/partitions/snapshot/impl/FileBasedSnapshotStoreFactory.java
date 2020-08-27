@@ -10,6 +10,8 @@ package io.zeebe.broker.system.partitions.snapshot.impl;
 import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.raft.snapshot.PersistedSnapshotStoreFactory;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import org.agrona.IoUtil;
 
 /**
@@ -26,6 +28,8 @@ public final class FileBasedSnapshotStoreFactory implements PersistedSnapshotSto
   public static final String SNAPSHOTS_DIRECTORY = "snapshots";
   public static final String PENDING_DIRECTORY = "pending";
 
+  private final Map<String, FileBasedSnapshotStore> partitionSnapshotStores = new HashMap();
+
   @Override
   public PersistedSnapshotStore createSnapshotStore(final Path root, final String partitionName) {
     final var snapshotDirectory = root.resolve(SNAPSHOTS_DIRECTORY);
@@ -34,7 +38,14 @@ public final class FileBasedSnapshotStoreFactory implements PersistedSnapshotSto
     IoUtil.ensureDirectoryExists(snapshotDirectory.toFile(), "Snapshot directory");
     IoUtil.ensureDirectoryExists(pendingDirectory.toFile(), "Pending snapshot directory");
 
-    return new FileBasedSnapshotStore(
-        new SnapshotMetrics(partitionName), snapshotDirectory, pendingDirectory);
+    return partitionSnapshotStores.computeIfAbsent(
+        partitionName,
+        p ->
+            new FileBasedSnapshotStore(
+                new SnapshotMetrics(partitionName), snapshotDirectory, pendingDirectory));
+  }
+
+  public FileBasedSnapshotStore getSnapshotStore(final String partitionName) {
+    return partitionSnapshotStores.get(partitionName);
   }
 }

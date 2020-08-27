@@ -249,8 +249,7 @@ public class RaftFailOverTest {
 
     assertThat(snapshot.getIndex()).isEqualTo(leaderSnapshot.getIndex()).isEqualTo(100);
     assertThat(snapshot.getTerm()).isEqualTo(leaderSnapshot.getTerm());
-    assertThat(snapshot.getId().getSnapshotIdAsString())
-        .isEqualTo(leaderSnapshot.getId().getSnapshotIdAsString());
+    assertThat(snapshot.getId()).isEqualTo(leaderSnapshot.getId());
   }
 
   @Test
@@ -276,8 +275,7 @@ public class RaftFailOverTest {
 
     assertThat(newSnapshot.getIndex()).isEqualTo(leaderSnapshot.getIndex()).isEqualTo(100);
     assertThat(newSnapshot.getTerm()).isEqualTo(leaderSnapshot.getTerm());
-    assertThat(newSnapshot.getId().getSnapshotIdAsString())
-        .isEqualTo(leaderSnapshot.getId().getSnapshotIdAsString());
+    assertThat(newSnapshot.getId()).isEqualTo(leaderSnapshot.getId());
     assertThat(newSnapshot).isEqualTo(firstSnapshot);
   }
 

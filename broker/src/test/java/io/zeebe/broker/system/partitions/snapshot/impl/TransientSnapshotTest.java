@@ -16,7 +16,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import io.atomix.raft.snapshot.PersistedSnapshotListener;
-import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.util.FileUtil;
 import java.io.File;
@@ -35,7 +34,7 @@ import org.junit.rules.TemporaryFolder;
 public class TransientSnapshotTest {
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
-  private PersistedSnapshotStore persistedSnapshotStore;
+  private FileBasedSnapshotStore persistedSnapshotStore;
   private Path lastTransientSnapshotPath;
 
   @Before
@@ -44,7 +43,8 @@ public class TransientSnapshotTest {
     final String partitionName = "1";
     final File root = temporaryFolder.getRoot();
 
-    persistedSnapshotStore = factory.createSnapshotStore(root.toPath(), partitionName);
+    persistedSnapshotStore =
+        (FileBasedSnapshotStore) factory.createSnapshotStore(root.toPath(), partitionName);
   }
 
   @Test
@@ -179,10 +179,7 @@ public class TransientSnapshotTest {
     assertThat(persistedSnapshot.getTimestamp()).isEqualTo(time);
 
     final var snapshotId = persistedSnapshot.getId();
-    assertThat(snapshotId.getSnapshotIdAsString()).isEqualTo("1-0-123");
-    assertThat(snapshotId.getIndex()).isEqualTo(1L);
-    assertThat(snapshotId.getTerm()).isEqualTo(0L);
-    assertThat(snapshotId.getTimestamp()).isEqualTo(time);
+    assertThat(snapshotId).isEqualTo("1-0-123");
 
     final var snapshotPath = persistedSnapshot.getPath();
     assertThat(snapshotPath).exists();

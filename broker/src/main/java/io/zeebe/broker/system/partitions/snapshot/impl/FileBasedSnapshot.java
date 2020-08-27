@@ -9,7 +9,6 @@ package io.zeebe.broker.system.partitions.snapshot.impl;
 
 import io.atomix.raft.snapshot.PersistedSnapshot;
 import io.atomix.raft.snapshot.SnapshotChunkReader;
-import io.atomix.raft.snapshot.SnapshotId;
 import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.util.FileUtil;
 import io.zeebe.util.ZbLogger;
@@ -94,8 +93,8 @@ public final class FileBasedSnapshot implements PersistedSnapshot {
   }
 
   @Override
-  public SnapshotId getId() {
-    return metadata;
+  public String getId() {
+    return metadata.getSnapshotIdAsString();
   }
 
   @Override

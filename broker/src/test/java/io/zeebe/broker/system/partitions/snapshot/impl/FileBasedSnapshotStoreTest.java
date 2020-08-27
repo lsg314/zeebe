@@ -10,7 +10,6 @@ package io.zeebe.broker.system.partitions.snapshot.impl;
 import static java.nio.file.StandardOpenOption.CREATE_NEW;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.atomix.raft.snapshot.PersistedSnapshotStore;
 import io.atomix.utils.time.WallClockTimestamp;
 import io.zeebe.util.FileUtil;
 import java.io.File;
@@ -28,20 +27,20 @@ import org.junit.rules.TemporaryFolder;
 public class FileBasedSnapshotStoreTest {
 
   @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
-  private PersistedSnapshotStore persistedSnapshotStore;
+  private FileBasedSnapshotStore persistedSnapshotStore;
   private Path snapshotsDir;
   private Path pendingSnapshotsDir;
-  private FileBasedSnapshotStoreFactory factory;
   private File root;
   private String partitionName;
 
   @Before
   public void before() {
-    factory = new FileBasedSnapshotStoreFactory();
     partitionName = "1";
     root = temporaryFolder.getRoot();
 
-    persistedSnapshotStore = factory.createSnapshotStore(root.toPath(), partitionName);
+    persistedSnapshotStore =
+        (FileBasedSnapshotStore)
+            new FileBasedSnapshotStoreFactory().createSnapshotStore(root.toPath(), partitionName);
 
     snapshotsDir =
         temporaryFolder
@@ -84,7 +83,8 @@ public class FileBasedSnapshotStoreTest {
     final var persistedSnapshot = transientSnapshot.persist();
 
     // when
-    final var snapshotStore = factory.createSnapshotStore(root.toPath(), partitionName);
+    final var snapshotStore =
+        new FileBasedSnapshotStoreFactory().createSnapshotStore(root.toPath(), partitionName);
 
     // then
     final var currentSnapshotIndex = snapshotStore.getCurrentSnapshotIndex();

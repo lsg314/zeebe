@@ -476,8 +476,7 @@ public final class RaftRule extends ExternalResource {
       throws Exception {
     final var snapshotOnNode = getSnapshotOnNode(sourceNode);
     final var targetSnapshotStore = new TestSnapshotStore(getOrCreatePersistedSnapshot(sourceNode));
-    final var receivedSnapshot =
-        targetSnapshotStore.newReceivedSnapshot(snapshotOnNode.getId().getSnapshotIdAsString());
+    final var receivedSnapshot = targetSnapshotStore.newReceivedSnapshot(snapshotOnNode.getId());
     for (final var reader = snapshotOnNode.newChunkReader(); reader.hasNext(); ) {
       receivedSnapshot.apply(reader.next());
     }
